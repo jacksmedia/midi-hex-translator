@@ -3,7 +3,7 @@ const multer = require('multer');
 const cors = require('cors');
 const fs = require('fs');
 const { parseMidiToEvents } = require('./parser');
-const { translateEventsToHex } = require('./translator');
+const { translateEventsToFlatHex } = require('./translator');
 
 const app = express();
 app.use(cors());
@@ -14,9 +14,7 @@ app.post('/upload', upload.single('midi'), async (req, res) => {
   const events = await parseMidiToEvents(req.file.path);
   const path = require('path');
   const schema = JSON.parse(fs.readFileSync(path.join(__dirname, '../translation-schemas/snes.json'), 'utf-8'));
-
-  // const schema = JSON.parse(fs.readFileSync('./translation-schemas/snes.json', 'utf-8'));
-  const hexes = translateEventsToHex(events, schema);
+  const hexes = translateEventsToFlatHex(events, schema);
 
   fs.unlinkSync(req.file.path);
 
