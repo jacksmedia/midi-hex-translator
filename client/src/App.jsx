@@ -22,7 +22,7 @@ function App() {
     <div className="p-4">
       <h1 className="text-xl mb-2">🎹 MIDI to Hex Bytecode</h1>
       <h5 className="text-sm mb-4">by xJ4cks & ChatGPT-4T</h5>
-      <h2 className="text-lg mb-4">Upload a MIDI file to get the hex bytecode</h2>
+      <h2 className="text-lg mb-4">Upload a MIDI file to get hex bytecode for the FFIV SNES rom</h2>
       <input type="file" accept=".mid" onChange={handleUpload} />
       <pre className="mt-4 bg-gray-100 p-2 wrapped">
         {hexDump}
