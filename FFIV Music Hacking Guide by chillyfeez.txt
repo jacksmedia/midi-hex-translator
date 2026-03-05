@@ -1,0 +1,279 @@
+Final Fantasy IV / Final Fantasy II US - Music Hacking Guide
+By Chillyfeez (chillyfeez@gmail.com)
+January 2013
+
+
+CONTENTS
+
+I. INTRODUCTION <FFIVMHG-1>
+
+II. WHAT YOU WILL NEED <FFIVMHG-2>
+
+III. ABOUT THIS GUIDE <FFIVMHG-3>
+
+IV. THE ANATOMY OF A FFIV SONG <FFIVMHG-4>
+
+V. INSTRUMENTS <FFIVMHG-5>
+
+VI. SONG DATA LOCATIONS <FFIVMHG-6>
+
+VII. SPC SEQUENCE DATA <FFIVMHG-7>
+
+VIII. TABLE OF NOTES, RESTS AND TIES <FFIVMHG-8>
+
+IX. THE REST OF THE COMMANDS <FFIVMHG-9>
+
+X. WHAT DO I DO NOW? <FFIVMHG-10>
+
+XI. THANKS <FFIVMHG-11>
+
+
+INTRODUCTION <FFIVMHG-1>
+
+Hello! If you're reading this, then you are probably interested in generating new music for the SNES version of Final Fantasy IV (FF2 in the US).  If that is not the case, then you are probably wasting your time by reading any further.  If you DO want to change FFIV music, then you've come to the right place! This guide is the product of my blood, sweat and tears (not really, but my free time, yes) over the past month or so, and while it is not an exhaustive compendium of information on the subject, it contains more than enough to completely overhaul the game's music (given some knowledge of music, and enough time and patience).
+
+WHAT YOU WILL NEED <FFIVMHG-2>
+
+1. A copy of the Final Fantasy IV/FFIIU ROM. Please don't asK me where to acquire this. If you've come this far, then you are aware of the legal implications of acquiring a ROM if you do not own the game cartridge. I bought my copy of FFIIU back in 1993 and still own it.  Then while on a trip to Japan, I purchased a FFIV Super Famicom cartridge in 1995 and still own that as well. If you look, you will probably be able to acquire these ROM files through means of more questionable legality. 
+2. A Hex Editor. I use Cygnus and Hexpose, but use whatever you want. www.romhacking.net is a good place to get a hex editor.
+3. A midi composing program. This is not absolutely necessary, but if you are really serious about composing new music for the game, I struggle to conceive of a way you could do so without one. There are plenty of freeware midi composition programs out there. Google it.
+4. At least a rough knowledge of how to read music, AND at least a rough knowledge of how to read hex. Without being able to read music, you can still do some damage with this guide, but you won't be able to write new songs for the game. Without knowledge of hex, you're pretty much screwed.
+
+ABOUT THIS GUIDE <FFIVMHG-3>
+
+I do all of my FFIV hacking with a version 1.0, headered ROM, so all data locations listed here will assume a header. If you prefer to work with an unheadered ROM, subtract 200 from any data location listed. Otherwise, the information presented in this guide should be valid regardless of version.
+
+As previously stated, this guide does not contain ALL of the information about hacking the game's music. If you know or discover something that is not included herein, please feel free to email me. There's enough here for my liking, so I likely won't do any more research, but I will gladly test your info and add it if you have anything new.
+
+About numbering: Counting gets muddy (in my opinion) when using a base-16 system. We understand that the set of digits ranges from 0 to F, but as humans functioning in the society in which we do, we still tend to think in base-10. When things are ennumerated in this guide (when I tell you there are 56 songs, or that each song has 13 instruments), I am speaking in base-10. If I say something specifically about hex code, chances are I'm speaking in base-16. In order to make this as easy as possible, the use of single-digit numbers will always indicate base-10, and "00, 01, 02 ... 09" indicates base-16. I hope that makes things a bit easier to understand (and not exactly the opposite).
+
+About Tracks: As with most music you've ever heard, video game music is made more interesting by harmonizing multipe sounds at the same time. Think of an orchestra playing, as opposed to a single violin. Any time you hear more than one note being played in the game, the game is utilizing this system. We call these different strings of notes tracks, which references a term used with professional recording equipment (NOT tracks as you would think about them on a CD, which of course do not play at the same time). Each FFIV song can use a maximum of 8 tracks, each of which can play a different instrument, and can play at varying volumes (along with a few other variable effects). This allows for the production of very complex music, but bear in mind that more tracks means more data used. To play a single note on eight different tracks (even if one or more of those tracks is "playing" a rest) uses eight times as much data as a single note played on one instrument. When planning your compositions, it's a good idea to keep this in mind, so as not to go overboard and run out of space.
+
+I do not claim to be the owner of the information in this guide. I did not come up with all of this on my own (see THANKS <FFIVMHG-11> at the end), and while I did spend a lot of time researching, experimenting, and writing the guide, it was mostly done for the purpose of my own entertainment. That being said, if you find this information useful, and you appreciate what I've done here, I would humbly appreciate credit in any project it helps you complete.
+
+THE ANATOMY OF A FFIV SONG <FFIVMHG-4>
+
+The game contains 56 individual songs of varying lengths but a common anatomy, which will be explained in this section. Each song also has an ID number, which is listed in the table below <FFIVMHG-6>. When the game (either during an event, or when the player enters a new location) needs to play a new song, this song ID is referenced.
+
+The rest of the songs' data is located within two separate data ranges:
+Instrument Index: 2420F-2490E
+SPC Sequences: 3790E-43AB8
+
+Instrument assignments for each song are located in an index beginning at 2420F. Each song has 13 instruments, with values 01-16 (see table below), and each instrument assignment is separated by one "00" byte. Even though each song has a maximum of 13 instruments, each instrument table is exactly two lines of code long. There are six "00" bytes at the end of each.
+
+INSTRUMENTS <FFIVMHG-5>
+The instrument values are as follows:
+
+Value	Instrument
+-----	----------
+01	Strings (bowed)
+02	Strings (plucked)
+03	Grand Piano
+04	Harp (different from 02. hard to describe - this is the first instrument heard at the title screen)
+05	Organ
+06	Trumpet
+07	Flute
+08	Xylophone
+09	Bass Guitar
+0A	Timpani
+0B	Electric Piano
+0C	Snare Drum (low snare)
+0D	Kick Drum
+0E	Snare Drum (hard snare)
+0F	Conga Drum
+10	Cymbals (crash)
+11	Hihat
+12	Cowbell
+13	Shaker
+14	Whistle
+15	Conga Drum Different, fuller sound than 0F)
+16	Chocobo
+
+So, for example, the instrument index for The Prelude (title screen music) is located at 244AF and reads:
+04 00 01 00 07 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00
+This means The Prelude has three instruments: Harp, Bowed Strings, and Flute.
+It is important to note that this information does not make any assertions about how many tracks are contained within The Prelude - Just that every track uses one of those three instruments.
+
+SONG DATA LOCATIONS <FFIVMHG-6>
+Data locations for each individual song are as follows:
+
+Song #	Song Title			Instrument Data	Sequence Data
+------	----------			---------------	-------------
+00	Nothing				2420F		3790E
+01	Final Fantasy			2422F		37927
+02	Wishing Tower			2424F		37CE8
+03	Fanfare (Dummy)			2426F		37DE6
+04	Yellow Chocobo			2428F		37F0F
+05	Black Chocobo			242AF		3824A
+06	Underworld			242CF		3850C
+07	Zeromus				242EF		38A71
+08	Victory Fanfare			2430F		395E4
+09	Town				2432F		3983C
+0A	Rydia				2434F		39A37
+0B	Boss Music			2436F		39E1C
+0C	Mt. Ordeals			2438F		3A635
+0D	Overworld			243AF		3A9D0
+0E	Big Whale			243CF		3ADDB
+0F	Sad Music			243EF		3B292
+10	Tent/Cabin			2440F		3B3FA
+11	Golbez				2442F		3B4BC
+12	Sorrow				2444F		3B7A3
+13	Rosa				2446F		3B985
+14	Baron Castle			2448F		3BCF5
+15	The Prelude			244AF		3BFAF
+16	Suspicions			244CF		3C561
+17	Tower of Zot			244EF		3C703
+18	Airship				2450F		3CACE
+19	Tower of Bab-il			2452F		3CE15
+1A	Fight 2				2454F		3D1A3
+1B	Within the Giant		2456F		3D663
+1C	Cave of Summoned Monsters	2458F		3DAAD
+1D	Destruction			245AF		3DCEA
+1E	Lunar Path			245CF		3DF10
+1F	Surprise!			245EF		3E14D
+20	Dwarf Castle			2460F		3E243
+21	Palom/Porom			2462F		3E455
+22	Calcobrena			2464F		3E708
+23	Hurry!				2466F		3E8A7
+24	Cid				2468F		3EAF7
+25	Into the Darkness		246AF		3EE78
+26	Dancing Music			246CF		3F33A
+27	Fight 1				246EF		3F611
+28	Castle Eblan			2470F		3FAD4
+29	Character Joined!		2472F		3FCE4
+2A	Character Died			2474F		3FDFF
+2B	Chocobo Forest			2476F		3FEE3
+2C	Opening				2478F		3FFC7
+2D	Sad 2				247AF		40339
+2E	Castle Fabul			247CF		40427
+2F	Fanfare (Became a Paladin)	247EF		40635
+30	Lard Ass Chocobo		2480F		40866
+31	Moon's Surface			2482F		409A2
+32	Toroia				2484F		40C84
+33	Mysidia				2486F		4104C
+34	Lunar Subterrane		2488F		41363
+35	Ending Part 1			248AF		41662
+36	Ending Part 2			248CF		42176
+37	Ending Part 3			248EF		4305C
+
+SPC SEQUENCE DATA <FFIVMHG-7>
+
+This is the part where you really get to change the music.  In order to do anything significant, you'll have to know a little something about reading and composing music.  I do because I took a few music theory courses in high school and college, but I'm definitely not qualified to teach that. Sorry. It would be a good idea to have a midi composing program open and switch between that and your hex editor during this process. To practice and learn this process, I used midi versions of classical music, which can be downloaded for free if you google for them, and pared them down to their barest forms by removing all but the most necessary instruments. 
+It is a tedious process composing a song this way, and learning to do so is even more arduous, but the results will be very rewarding if your aim is to really alter the game.
+A few things to keep in mind:
+1) You've got a limited amount of space for each song, but it is possible to extend one song by eliminating the song after it.
+2) Unlike the way a song appears as sheet music or sounds to the ear, the length of a song in code is determined primarily by the AMOUNT OF NOTES AND RESTS, and secondarily by the amount of octave changes. 8 whole notes, 16 quarter notes and 8 eighth notes will use exactly the same amount of data as 32 64th notes, but will last more than three times as long when played.
+3) Each track can only play one note at a time. If you want to compose piano music (or guitar music, or any other instrument that typically plays chords instead of just notes), you'll have to use a separate track for each note within a chord. This is an easy way to use up most of the data space alotted to a song, so try to keep it simple.
+
+The Header
+
+Each song begins with a header of 18 bytes, which tell the game the length of the song and where to look for the beginning of each track within the song.
+
+Bytes 00-01: Sequence length - reverse byte order. If the song uses 3A2 bytes, the first two bytes will read "A2 03." Unlike every other counting and ennumerationfunction within a song sequence, this DOES include itself in the count (in all other instances, counting lengths disregard bytes 00 and 01, as immediately below).  By the way... it's OK if this number represents a length LONGER than the actual song sequence - the game will just ignore whatever comes after the end of the last track.  It's NOT OK if you mark the sequence too short. Generally, this will make the last track end abruptly.
+Bytes 02-11: Track pointers - two bytes each, reverse byte order.  Each pointer is represented as "XX 2X." I don't know where the 2 comes from, but the XXX refers to the amount of bytes from the beginning of the song, NOT including bytes 00 and 01. Thus, the first track pointer is pretty much always 10 20 (indicating that the first track's data begins immediately after the last pointer). Unused pointers will be "00 00," so if the song only has two tracks, then the last twelve bytes will all be zeros.
+
+In-sequence Commands (Including Notes, Rests and Ties)
+
+Every command is listed below, in order, from 00 to FF. Commands have no parameters unless otherwise indicated. Some commands have parameters, but no discernable effect (as far as I can tell). If a command is not listed (such as E3), then it has no effect and no parameters.
+In general, tracks also start off with their own header, which indicates information such as the relative volume of the track, which instrument to use, how much reverb, etc. These track headers are commands that the game treats no differently than notes and rests, and therefore the commands typically located in the track's header can also be placed within the track to change effects mid-track. SPC data is read quickly enough that the game will execute in-track commands without the music stopping or slowing down, so have fun!
+
+TABLE OF NOTES, RESTS AND TIES <FFIVMHG-8>
+
+Commands 00 through D1 each represent a note, a rest, or an extension of a previous note or rest (a tie). When deciding to use a tie, bear in mind that game music does not need to fit into a specific time signature, so whereas a piece of sheet music may tie an eighth note at the end of one measure to an eighth note at the beginning of the next measure, you can save one byte of space by simply using a quarter note. This is also the practical application of the 3/4, 3/8 and 3/16 notes (which do not exist in standard music notation). Other odd-fraction note durations (1/3, 1/6, 1/12, 1/24, 1/48) can be used when you want to play triplets. It takes a bit of mathematical thinking. Three triplet quarter notes have the same duration as two regular quarter notes (or one half note), so in order to play three triplet quarter notes, play three 1/6 notes.
+(1/6 + 1/6 + 1/6 = 3/6, or 1/2)
+
+Note Length	C   C#  D   D#  E   F   F#  G   G#  A   A#  B   REST  TIE
+-----------	--  --  --  --  --  --  --  --  --  --  --  --  ----  ---
+	1/1	00  0F  1E  2D  3C  4B  5A  69  78  87  96  A5  B4    C3
+	3/4	01  10  1F  2E  3D  4C  5B  6A  79  88  97  A6  B5    C4
+	1/2	02  11  20  2F  3E  4D  5C  6B  7A  89  98  A7  B6    C5
+	3/8	03  12  21  30  3F  4E  5D  6C  7B  8A  99  A8  B7    C6
+	1/3	04  13  22  31  40  4F  5E  6D  7C  8B  9A  A9  B8    C7
+	1/4	05  14  23  32  41  50  5F  6E  7D  8C  9B  AA  B9    C8
+	3/16	06  15  24  33  42  51  60  6F  7E  8D  9C  AB  BA    C9
+	1/6	07  16  25  34  43  52  61  70  7F  8E  9D  AC  BB    CA
+	1/8	08  17  26  35  44  53  62  71  80  8F  9E  AD  BC    CB
+	1/12	09  18  27  36  45  54  63  72  81  90  9F  AE  BD    CC
+	1/16	0A  19  28  37  46  55  64  73  82  91  A0  AF  BE    CD
+	1/24	0B  1A  29  38  47  56  65  74  83  92  A1  B0  BF    CE
+	1/32	0C  1B  2A  39  48  57  66  75  84  93  A2  B1  C0    CF
+	1/48	0D  1C  2B  3A  49  58  67  76  85  94  A3  B2  C1    D0
+	1/64	0E  1D  2C  3B  4A  59  68  77  86  95  A4  B3  C2    D1
+
+THE REST OF THE COMMANDS <FFIVMHG-9>
+
+D2: (+ 3 parameters, XX YY ZZ) Fade in tempo, where XX YY is the rate of fade, and ZZ is the tempo. Higher ZZ = quicker tempo. XX YY are in reverse byte order, and higher value = slower fade. You will rarely if ever need to set YY higher than 00.
+
+D3: (+ 3 parameters) No discernable effect.
+
+D4: (+ 1 parameter) Sets the "multiple voice" effect of a track, for lack of a better term. The higher the value, the more it will seem like each note is being played on several keys (or instruments) simultaneously. The effect is most significant with the organ, creating a difference between what sounds like an electric organ (think "Come On, Baby Light My Fire" by The Doors), and a pipe organ (think church).
+
+D5: (+ 2 parameters, XX YY) Reverb. The first parameter sets the reverb level (higher value = more echo). The second parameter seems to set the reverb of the reverb. Be careful with this. Set a high YY in combination with a high XX, and a single note will quickly turn into that sound the alien makes when the scientists try to dissect it in Independence Day.
+
+D6: (+ 3 parameters) A very funky reverb effect. Not very useful for composing music per se, but maybe useful for implementing sound effects within music. The three parameters seem to work independently of one another (they are three separate parameters, and not one or two multiple byte parameters). The higher their value, the funkier the effect, but there seems to be a ceiling. I know, for example, that "35" has an effect, but "AA" does not. "D6 0F 0F 0F" Has a fun, but again not really useful, effect. More experimentation is needed here, but I don't really have the motivation to do so.
+
+D7: (+ 3 parameters) No discernable effect.
+
+D8: (+ 3 parameters) No discernable effect.
+
+D9: (+ 3 parameters) No discernable effect.
+
+DA: (+ 1 parameter) Set octave. 00 is the lowest.  I don't know how high it can go, but can't imagine you'd need to go higher than 07 or 08.
+
+DB: (+ 1 parameter) Set instrument, where "40" is the first instrument assigned to the song (in the index at 2420F), "41" is the second, and so on. Some weird stuff happens if you set an unassigned instrument. One higher in value than the last instrument seems to be a quieter version of that instrument, two higher even quieter than before, and so on in that fashion until you cannot hear the music at all. Several values lower than 40 (I couldn't bear to experiment with exactly how many) will result in something that sounds like a buzzsaw playing the notes you've written. Very grating and not recommended.
+
+DC, DD: (+ 1 parameter each) I can't figure out what these do. According to jce3000gt, they are "set transpose" and "increment transpose," respectively. In this particular instance I don't know what that means, and in my experimentation, changing the value of these parameters has no effect.
+
+DE: (+1 parameter) Set track volume. Near as I can tell, this is a RELATIVE volume value. If there is only one track in the song, changing this value has no effect.
+
+DF: (+ 1 parameter) No discernable effect.
+
+E0/F0: Loop Start/End. E0 is inserted before the section to loop, with one parameter indicating the number of times to loop. F0 is inserted at the end of the section to loop (no parameter). Interesting note - without an "E0" at the beginning, F0 will simply play a sustained C (or, lowest note on the scale).
+
+E1: Next octave up. All subsequent notes will be played in the octave above those preceding this command.
+
+E2: Next octave down. All subsequent notes will be played in the octave below those preceding this command.
+
+EA/EB: Not quite sure - deep investigation indicates that every track (maybe - see Mt. Ordeals, anyway) has one or the other of these before the musical notaion starts...
+
+EC: Makes all subsequent notes sound like static instead of notes.
+
+F0: (SEE E0)
+
+F1: Stops the music.
+
+F2: (+ 3 parameters, XX YY ZZ) Volume. Only ZZ seems to have any effect, and it looks like XX YY is always 00 00 in the game's original programming.
+
+F3: (+3 parameters, XX YY ZZ) I don't know what this does. It must have some effect, because in the original programming, every song has an F3 command in the beginning. Seems XX and YY have no effect, because they're always 00 00. ZZ ranges from about 50 to C0, and is most commonly in the 80s.
+
+F4: (+ 2 parameters) This is the "go to" command. Placing this command at the end of every track is how the game loops music indefinitely. Remember, as before, to start counting with 00 20 (reverse byte order), and to count from the song's byte #02, not byte #00.
+
+F5: (+ 3 parameters) No discernable effect.
+
+F6 and above: Stops the music.
+
+WHAT DO I DO NOW? <FFIVMHG-10>
+
+So, you've read this guide and have at least some understanding of what I am saying. What should you do now? I recommend you experiment first with a very simple melody. Compose one, or download and open one on your midi composer. Start off with just one track.  
+
+First, pick a song you want to change. For the purpose of experimenting, use The Prelude, because it will automatically play when you start the game.
+
+Next thing to do is "erase" the existing music. Obviously, deleting the data will screw up the game, so you are going to overwrite it with "blank" information. In the song header, keep the sequence length (bytes 00-01) the same, then change everything after the first track pointer (bytes 04-11) to 00. 
+
+For now, keep the first track's header as-is. While there are a lot of cool effects you can employ in a track header, it's more important to get comfortable with how to write notes first, so jump to 3BFEO (the first note of the first track). from here to the end of the song, we're going to overwrite with whole rests, so type "B4" about a gozillion times, until you get to 3C560 (the end of the song).
+
+Next, let's try writing a diatonic major scale (do re mi fa so la ti do). We'll use eighth notes, because they last long enough to hear, but won't keep us sitting here all day listening to them. So, jump back to 3BFEO, then look at the chart above <FFIVMHG-8> to find the eigth note commands for C, D, E, F, G, A and B (the notes used in a C Major scale). Type them in beginning at 3BFEO: 08 26 44 53 71 8F AD. So there's "do re mi fa so la ti," but now we need our final "do." Problem is, if we type 08 again, the music will jump back down. We need to move up to the next octave for our final "do." So, type E1 (octave up) first, then type 08. you will end up with: 08 26 44 53 71 8F AD E1 08. There's your scale. let's make it repeat, so when we start the game, it plays this scale over and over and over... The first thing we need to do is jump back down to our original octave, or else the E1 will continue to bump each scale up, so type E2 (octave down) next.  Then we need to write our "go to" command. There's no need to go to the very beginning of the track, as all of the information in the header will remain valid, so we'll count forward from the beginning of the track (2010) to the beginning of the song (which takes us to 202F). Type "F4 2F 20" (Go to the 02Fth byte of this song, which is the first note of the first track). So in the end, what you should have (after the track header, which we have left unchanged) is: 08 26 4453 71 8F AD E1 08 E2 F4 2F 20. Great. Now save your work and open the ROM in your emulator. Voila! You've just replaced one of the prettiest pieces of music in video game history with a repeating scale (hope you have a copy).
+
+So that's just a quick tutorial. Obviously, you can do much more interesting stuff than that with the information in this guide, so play around a bit and see what you can come up with. the other file zipped along with this one ("Bach Air") is a sample of something that I used to replace Rosa's theme. If you copy and paste that at 3B985, the game will play Bach's "Air on a G String" instead of Rosa's theme, just for an example of what can be done.  Of course, you can use this to replace any song that is at least this length, but the file happens to be exactly the same length as "Rosa" (you can even see that the last few lines of code are left over from when it WAS "Rosa." Didn't need to change those).
+
+THANKS <FFIVMHG-11>
+
+Of course, none of this would exist if not for the Squaresoft team that created Final Fantasy IV, so special thanks to them. Finish the game and watch the credits for a complete list.
+
+Special Thanks also go out to jce3000gt, and the rest of the contributors of the Slick Productions SPC topic, especially this thread: http://slickproductions.org/forum/index.php?topic=163.0 
+The information found there definitely served as the starting point for this guide, and without it, I likely would not have been able to do all of this.
+
+Also, thanks go to MetroidQuest. Reading his guide to hacking FFVI music on ff6hacking.com (http://www.ff6hacking.com/forums/showthread.php?tid=493) helped quite a bit in understanding the SPC structure of (Final Fantasy, anyway) video games.
+
+
+
