@@ -66,36 +66,96 @@ function translateNotesToHex(notes, schema) {
   return hexOutput;
 }
 
-function translateTracksToHex(tracks, schema, gmToFfiv) {
-  const activeTracks = tracks.filter(t => t.notes.length > 0);
+// All drum hits are mapped to C4 at a fixed short duration.
+// The instrument (set by DB) is what defines the drum sound in the SPC engine.
+const DRUM_HIT_DURATION = 0.0625;
 
-  // Assign melodic instrument slots (max 13 total)
-  const slotMap = {}; // gmNumber → slot index
-  let nextSlot = 0;
+const FFIV_DRUM_NAMES = {
+  8: 'Xylophone', 10: 'Timpani', 12: 'Snare low', 13: 'Kick',
+  14: 'Snare hard', 15: 'Conga', 16: 'Cymbals', 17: 'Hihat',
+  18: 'Cowbell', 19: 'Shaker', 20: 'Whistle', 21: 'Conga fuller'
+};
 
-  for (const track of activeTracks) {
-    if (track.isPercussion) continue;
-    if (!(track.gmNumber in slotMap) && nextSlot < 13) {
-      slotMap[track.gmNumber] = nextSlot++;
+// Splits a single GM percussion track into one virtual track per FFIV drum instrument.
+// Each virtual track's notes are: REST(gap) + C4(hit) pairs, ready for translateNotesToHex.
+function expandPercussionTrack(track, gmDrumMap) {
+  const groups = {}; // ffivValue (number) → notes[]
+
+  for (const note of track.notes) {
+    const ffivValue = gmDrumMap[note.midi] ?? 13; // default Kick
+    if (!groups[ffivValue]) groups[ffivValue] = [];
+    groups[ffivValue].push(note);
+  }
+
+  return Object.entries(groups).map(([ffivValueStr, notes]) => {
+    const ffivValue = parseInt(ffivValueStr);
+    const sorted = [...notes].sort((a, b) => a.time - b.time);
+
+    const virtualNotes = [];
+    let cursor = 0;
+
+    for (const note of sorted) {
+      const gap = note.time - cursor;
+      if (gap > 0.01) virtualNotes.push({ name: 'REST', duration: gap });
+      virtualNotes.push({ name: 'C4', duration: DRUM_HIT_DURATION });
+      cursor = note.time + DRUM_HIT_DURATION;
+    }
+
+    return {
+      trackIndex: track.trackIndex,
+      gmNumber: -1,
+      gmName: FFIV_DRUM_NAMES[ffivValue] ?? `drum-${ffivValue.toString(16).toUpperCase()}`,
+      isPercussion: true,
+      ffivValue,
+      notes: virtualNotes
+    };
+  });
+}
+
+function translateTracksToHex(tracks, schema, gmToFfiv, gmDrumMap) {
+  // Expand any percussion tracks into per-drum-instrument virtual tracks first.
+  const activeTracks = [];
+  for (const track of tracks) {
+    if (track.notes.length === 0) continue;
+    if (track.isPercussion) {
+      activeTracks.push(...expandPercussionTrack(track, gmDrumMap));
+    } else {
+      activeTracks.push(track);
     }
   }
 
-  const hasPercussion = activeTracks.some(t => t.isPercussion);
-  const percSlot = hasPercussion ? (nextSlot < 13 ? nextSlot++ : 12) : null;
+  // Assign slots: melodic tracks keyed by gmNumber, drum tracks keyed by ffivValue.
+  const melodicSlotMap = {}; // gmNumber → slot
+  const drumSlotMap = {};    // ffivValue → slot
+  let nextSlot = 0;
 
-  // Build instrument index (slot → FFIV ROM value)
+  for (const track of activeTracks) {
+    if (!track.isPercussion) {
+      if (!(track.gmNumber in melodicSlotMap) && nextSlot < 13) {
+        melodicSlotMap[track.gmNumber] = nextSlot++;
+      }
+    } else {
+      if (!(track.ffivValue in drumSlotMap) && nextSlot < 13) {
+        drumSlotMap[track.ffivValue] = nextSlot++;
+      }
+    }
+  }
+
+  // Build instrument index (slot → FFIV ROM value).
   const instrumentIndex = [];
-  for (const [gm, slot] of Object.entries(slotMap)) {
+  for (const [gm, slot] of Object.entries(melodicSlotMap)) {
     instrumentIndex[slot] = gmToFfiv[parseInt(gm)];
   }
-  if (percSlot !== null) {
-    instrumentIndex[percSlot] = 0x0D; // Kick as percussion placeholder
+  for (const [ffivVal, slot] of Object.entries(drumSlotMap)) {
+    instrumentIndex[slot] = parseInt(ffivVal);
   }
 
   const trackData = activeTracks.map(track => {
     const isPerc = track.isPercussion;
-    const slot = isPerc ? percSlot : (slotMap[track.gmNumber] ?? 0);
-    const ffivValue = isPerc ? 0x0D : gmToFfiv[track.gmNumber];
+    const slot = isPerc
+      ? (drumSlotMap[track.ffivValue] ?? 0)
+      : (melodicSlotMap[track.gmNumber] ?? 0);
+    const ffivValue = isPerc ? track.ffivValue : gmToFfiv[track.gmNumber];
 
     const dbByte = (0x40 + slot).toString(16).toUpperCase().padStart(2, '0');
     const echoCmd = isPerc ? 'EB' : 'EA';

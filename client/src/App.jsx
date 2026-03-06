@@ -110,8 +110,8 @@ function App() {
               return override ? `[${override}]` : v;
             }).join(' ')}
           </p>
-          {result.tracks.map(track => (
-            <div key={track.trackIndex} style={{ marginBottom: '1.5rem' }}>
+          {result.tracks.map((track, i) => (
+            <div key={i} style={{ marginBottom: '1.5rem' }}>
               <p style={{ marginBottom: '0.25rem' }}>
                 <strong>Track {track.trackIndex}</strong>{' '}
                 | {track.gmName} (GM {track.gmNumber}){' '}

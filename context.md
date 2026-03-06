@@ -256,11 +256,20 @@ D5 (reverb), D4 (multi voice), D2 (fade tempo) are song-level, placed only in Tr
 ## New Files (this feature)
 
 - `translation-schemas/gm-to-ffiv.json`: 128-element array, index = GM program number, value = FFIV ROM instrument byte (1–22 decimal). Hand-crafted by instrument family.
+- `translation-schemas/gm-drums.json`: object keyed by GM drum note number (35–81), value = FFIV instrument byte (decimal). Maps kick/snare/hihat/cymbal/conga/etc. to corresponding FFIV percussive instruments.
+
+## Percussion Granularity Implementation
+
+- `expandPercussionTrack(track, gmDrumMap)` in `translator.js` splits one GM percussion track into N virtual tracks, one per unique FFIV drum instrument used
+- Virtual track notes: `REST` events fill time gaps; `C4` at `DRUM_HIT_DURATION = 0.0625` represents each hit — pitch is irrelevant for drums, instrument sample provides the sound
+- Slot assignment now uses two maps: `melodicSlotMap` (gmNumber → slot) and `drumSlotMap` (ffivValue → slot)
+- All virtual drum tracks automatically receive `EB` (no echo) in their track header
+- React `key` uses array index `i`, not `track.trackIndex`, since virtual tracks share the original track's index
 
 ## Open Questions (Remaining)
 
-1. **Track volume (DE / F2 ZZ)** — DE is `5F` (95) in almost every original track. F2 ZZ varies. A reasonable approach: map MIDI velocity average → F2 ZZ; use `DE 5F` as a fixed default.
+1. ~~**Track volume (DE / F2 ZZ)**~~ — DE is constant (`5F`) across all original FFIV tracks; F2 ZZ varies but `C8` is a solid default. No feature needed — both hardcoded values are correct.
 2. **DC/DD (transpose)** — purpose still unknown; safely omitted.
 3. ~~**@tonejs/midi instrument data**~~ ✓ — `track.instrument.number` (GM 0–127), `track.instrument.name`, `track.instrument.percussion`, `track.channel` (9 = percussion). All available without a test script.
 4. ~~**F4 loop offsets**~~ ✓ — implemented in `assembleSPCSequence`; loop target = trackOffset + 13 (DA 04).
-5. **Percussion instrument granularity** — GM channel 10 uses note pitch to select drum sound; currently all percussion tracks share one slot (Kick, 0D) as a placeholder. True mapping needs per-note GM drum → FFIV instrument splitting into virtual tracks.
+5. ~~**Percussion instrument granularity**~~ ✓ — `expandPercussionTrack` splits GM channel-10 tracks by drum note → FFIV instrument; each drum type becomes its own slot + virtual track.
