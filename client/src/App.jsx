@@ -102,6 +102,36 @@ function App() {
         </>
       )}
       {result && (
+        <details style={{ marginTop: '1rem', marginBottom: '0.5rem' }}>
+          <summary style={{ cursor: 'pointer', fontWeight: 'bold' }}>
+            Debug: raw MIDI parse ({result.rawTracks.length} track{result.rawTracks.length !== 1 ? 's' : ''} →
+            expanded to {result.tracks.length})
+          </summary>
+          <table style={{ marginTop: '0.5rem', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
+            <thead>
+              <tr>
+                {['MIDI track', 'GM name', 'GM #', 'Perc?', 'Notes'].map(h => (
+                  <th key={h} style={{ textAlign: 'left', padding: '2px 12px 2px 0', borderBottom: '1px solid #555' }}>
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {result.rawTracks.map((t, i) => (
+                <tr key={i} style={{ opacity: t.noteCount === 0 ? 0.45 : 1 }}>
+                  <td style={{ padding: '2px 12px 2px 0' }}>{t.trackIndex}</td>
+                  <td style={{ padding: '2px 12px 2px 0' }}>{t.gmName}</td>
+                  <td style={{ padding: '2px 12px 2px 0' }}>{t.gmNumber}</td>
+                  <td style={{ padding: '2px 12px 2px 0' }}>{t.isPercussion ? 'yes' : '—'}</td>
+                  <td style={{ padding: '2px 12px 2px 0' }}>{t.noteCount}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </details>
+      )}
+      {result && (
         <div className="mt-4">
           <p style={{ marginBottom: '1rem' }}>
             <strong>Instrument slots ({result.slotCount}):</strong>{' '}

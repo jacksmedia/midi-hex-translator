@@ -22,7 +22,15 @@ app.post('/upload', upload.single('midi'), async (req, res) => {
 
   fs.unlinkSync(req.file.path);
 
-  res.json({ ...result, sequence });
+  const rawTracks = tracks.map(({ trackIndex, gmName, gmNumber, isPercussion, notes }) => ({
+    trackIndex,
+    gmName,
+    gmNumber,
+    isPercussion,
+    noteCount: notes.length
+  }));
+
+  res.json({ ...result, sequence, rawTracks });
 });
 
 app.listen(3001, () => console.log('Server running on http://localhost:3001'));
