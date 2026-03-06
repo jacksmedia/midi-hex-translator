@@ -10,6 +10,7 @@ async function parseMidiToEvents(input) {
 
     return {
       trackIndex,
+      channel: track.channel ?? null,
       gmNumber: track.instrument?.number ?? 0,
       gmName: track.instrument?.name ?? 'acoustic grand piano',
       isPercussion,

@@ -110,7 +110,7 @@ function App() {
           <table style={{ marginTop: '0.5rem', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
             <thead>
               <tr>
-                {['MIDI track', 'GM name', 'GM #', 'Perc?', 'Notes'].map(h => (
+                {['MIDI track', 'Channel', 'GM name', 'GM #', 'Perc?', 'Notes'].map(h => (
                   <th key={h} style={{ textAlign: 'left', padding: '2px 12px 2px 0', borderBottom: '1px solid #555' }}>
                     {h}
                   </th>
@@ -121,6 +121,7 @@ function App() {
               {result.rawTracks.map((t, i) => (
                 <tr key={i} style={{ opacity: t.noteCount === 0 ? 0.45 : 1 }}>
                   <td style={{ padding: '2px 12px 2px 0' }}>{t.trackIndex}</td>
+                  <td style={{ padding: '2px 12px 2px 0' }}>{t.channel ?? '—'}</td>
                   <td style={{ padding: '2px 12px 2px 0' }}>{t.gmName}</td>
                   <td style={{ padding: '2px 12px 2px 0' }}>{t.gmNumber}</td>
                   <td style={{ padding: '2px 12px 2px 0' }}>{t.isPercussion ? 'yes' : '—'}</td>

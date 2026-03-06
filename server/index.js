@@ -22,8 +22,9 @@ app.post('/upload', upload.single('midi'), async (req, res) => {
 
   fs.unlinkSync(req.file.path);
 
-  const rawTracks = tracks.map(({ trackIndex, gmName, gmNumber, isPercussion, notes }) => ({
+  const rawTracks = tracks.map(({ trackIndex, channel, gmName, gmNumber, isPercussion, notes }) => ({
     trackIndex,
+    channel,
     gmName,
     gmNumber,
     isPercussion,

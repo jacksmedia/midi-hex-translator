@@ -257,4 +257,4 @@ function assembleSPCSequence(tracks) {
   });
 }
 
-module.exports = { translateTracksToHex, assembleSPCSequence };
+module.exports = { translateTracksToHex, assembleSPCSequence, expandPercussionTrack };
