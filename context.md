@@ -138,7 +138,7 @@ Format: `F4 XX YY` where `XX YY` is little-endian offset counted from song byte 
 2. ~~**No song sequence header**~~ ✓ — `assembleSPCSequence()` builds the 18-byte header with correct track pointers.
 3. ~~**No track headers**~~ ✓ — F2, F3, DB, DE, EA/EB, DA 04 are now emitted per track.
 4. ~~**No F4 loop command**~~ ✓ — F4 appended to each track; loop target = DA 04 byte (trackOffset + 13) to prevent octave drift.
-5. **No instrument index block download** — blob is built server-side but not separately downloadable yet.
+5. ~~**No instrument index block download**~~ ✓ — client builds the 32-byte blob from `result.instrumentIndex` + user overrides; "Save instrument index as .bin" button added.
 6. **E1/E2 are output as string literals**, not as the hex bytes 0xE1/0xE2 — this actually works fine since they ARE `E1`/`E2` in hex! The schema uses 2-char uppercase hex strings and so do these. This is correct behavior.
 
 ---
@@ -162,15 +162,17 @@ Format: `F4 XX YY` where `XX YY` is little-endian offset counted from song byte 
 - `??` tokens substituted with `00` in final output
 - Server response now includes `sequence` field (array of hex strings); client downloads it directly
 
-### Phase 4 — Instrument index block
-- Collect unique instruments from all tracks (max 13)
-- Build 32-byte instrument index: `[inst1] 00 [inst2] 00 ... 00 00 00 00 00 00`
-- Output as separate blob alongside the sequence
+### ~~Phase 4 — Instrument index block~~ ✓
+- 32-byte blob constructed client-side in `App.jsx` (`buildInstrumentIndexBytes`)
+- Format: `[val] 00` per slot, zero-padded to 32 bytes; user overrides applied before download
+- No server changes needed — `result.instrumentIndex` already carries all slot values
 
-### Phase 5 — UI
-- Per-track panel: show track #, detected MIDI instrument name, dropdown to select FFIV instrument (01–16)
-- "Download sequence" button → `.bin` of the sequence data (already done for flat output)
-- "Download instrument index" button → 32-byte `.bin` blob
+### ~~Phase 5 — UI~~ ✓
+- `FFIV_INSTRUMENTS` constant (module-level) drives per-track dropdown; values 01–16
+- `instrumentOverrides` state keyed by slot index; reset on new file upload
+- Tracks sharing a slot stay in sync (overrides are per-slot, not per-track)
+- "Save sequence as .bin" + "Save instrument index as .bin" buttons; shared `triggerDownload` helper
+- Instrument slot summary row shows override values in brackets when changed
 
 ---
 
