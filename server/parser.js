@@ -5,22 +5,23 @@ async function parseMidiToEvents(filepath) {
   const data = fs.readFileSync(filepath);
   const midi = new Midi(data);
 
-  const parsed = [];
+  return midi.tracks.map((track, trackIndex) => {
+    const isPercussion = track.channel === 9 || track.instrument?.percussion === true;
 
-  midi.tracks.forEach((track, trackIndex) => {
-    track.notes.forEach(note => {
-      parsed.push({
-        track: trackIndex,
+    return {
+      trackIndex,
+      gmNumber: track.instrument?.number ?? 0,
+      gmName: track.instrument?.name ?? 'acoustic grand piano',
+      isPercussion,
+      notes: track.notes.map(note => ({
         time: note.time,
         midi: note.midi,
         duration: note.duration,
         velocity: note.velocity,
         name: note.name
-      });
-    });
+      }))
+    };
   });
-
-  return parsed;
 }
 
 module.exports = { parseMidiToEvents };

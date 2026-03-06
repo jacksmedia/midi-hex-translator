@@ -2,7 +2,7 @@
 import { useState } from 'react';
 
 function App() {
-  const [hexDump, setHexDump] = useState('');
+  const [result, setResult] = useState(null);
   const [fileName, setFileName] = useState('output');
 
   async function handleUpload(e) {
@@ -17,13 +17,12 @@ function App() {
       body: formData,
     });
 
-    const result = await response.text();
-    setHexDump(result);
+    setResult(await response.json());
   }
 
   function handleDownload() {
-    const tokens = hexDump.trim().split(/\s+/);
-    const bytes = new Uint8Array(tokens.map(t => parseInt(t, 16)));
+    const allHex = result.tracks.flatMap(t => t.hex).filter(t => t !== '??');
+    const bytes = new Uint8Array(allHex.map(t => parseInt(t, 16)));
     const blob = new Blob([bytes], { type: 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
 
@@ -40,14 +39,33 @@ function App() {
       <h5 className="text-sm mb-4">by xJ4cks & ChatGPT-4T</h5>
       <h2 className="text-lg mb-4">Upload a MIDI file to get hex bytecode for the FFIV SNES rom</h2>
       <input type="file" accept=".mid" onChange={handleUpload} />
-      {hexDump && (
+      {result && (
         <button onClick={handleDownload} style={{ marginLeft: '1rem' }}>
           Save as .bin
         </button>
       )}
-      <pre className="mt-4 bg-gray-100 p-2 wrapped">
-        {hexDump}
-      </pre>
+      {result && (
+        <div className="mt-4">
+          <p style={{ marginBottom: '0.5rem' }}>
+            <strong>Instrument Index ({result.slotCount} slots):</strong>{' '}
+            {result.instrumentIndex.join(' ')}
+          </p>
+          {result.tracks.map(track => (
+            <div key={track.trackIndex} style={{ marginBottom: '1.5rem' }}>
+              <p>
+                <strong>Track {track.trackIndex}</strong>{' '}
+                | {track.gmName} (GM {track.gmNumber}){' '}
+                → FFIV {track.ffivInstrument}{' '}
+                | Slot {track.slot}
+                {track.isPercussion ? ' [PERC]' : ''}
+              </p>
+              <pre className="bg-gray-100 p-2 wrapped">
+                {track.hex.join(' ')}
+              </pre>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
