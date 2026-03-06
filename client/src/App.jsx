@@ -101,11 +101,11 @@ function App() {
           </button>
         </>
       )}
-      {result && (
+      {result && result.rawTracks && (
         <details style={{ marginTop: '1rem', marginBottom: '0.5rem' }}>
           <summary style={{ cursor: 'pointer', fontWeight: 'bold' }}>
-            Debug: raw MIDI parse ({result.rawTracks.length} track{result.rawTracks.length !== 1 ? 's' : ''} →
-            expanded to {result.tracks.length})
+            Debug: raw MIDI parse ({result.rawTracks.length} track{result.rawTracks.length !== 1 ? 's' : ''}{' '}
+            &rarr; expanded to {result.tracks.length})
           </summary>
           <table style={{ marginTop: '0.5rem', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
             <thead>
