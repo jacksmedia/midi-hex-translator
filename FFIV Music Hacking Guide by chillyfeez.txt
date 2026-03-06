@@ -86,7 +86,7 @@ Value	Instrument
 12	Cowbell
 13	Shaker
 14	Whistle
-15	Conga Drum Different, fuller sound than 0F)
+15	Conga Drum (Different, fuller sound than 0F)
 16	Chocobo
 
 So, for example, the instrument index for The Prelude (title screen music) is located at 244AF and reads:
