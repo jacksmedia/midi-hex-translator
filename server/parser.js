@@ -1,8 +1,8 @@
 const fs = require('fs');
 const { Midi } = require('@tonejs/midi');
 
-async function parseMidiToEvents(filepath) {
-  const data = fs.readFileSync(filepath);
+async function parseMidiToEvents(input) {
+  const data = Buffer.isBuffer(input) ? input : fs.readFileSync(input);
   const midi = new Midi(data);
 
   return midi.tracks.map((track, trackIndex) => {
