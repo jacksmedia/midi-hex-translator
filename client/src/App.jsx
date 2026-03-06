@@ -21,8 +21,7 @@ function App() {
   }
 
   function handleDownload() {
-    const allHex = result.tracks.flatMap(t => t.hex).filter(t => t !== '??');
-    const bytes = new Uint8Array(allHex.map(t => parseInt(t, 16)));
+    const bytes = new Uint8Array(result.sequence.map(t => parseInt(t, 16)));
     const blob = new Blob([bytes], { type: 'application/octet-stream' });
     const url = URL.createObjectURL(blob);
 

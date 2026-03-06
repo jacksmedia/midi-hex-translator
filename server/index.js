@@ -4,7 +4,7 @@ const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 const { parseMidiToEvents } = require('./parser');
-const { translateTracksToHex } = require('./translator');
+const { translateTracksToHex, assembleSPCSequence } = require('./translator');
 
 const app = express();
 app.use(cors());
@@ -17,10 +17,11 @@ const gmToFfiv = JSON.parse(fs.readFileSync(path.join(__dirname, '../translation
 app.post('/upload', upload.single('midi'), async (req, res) => {
   const tracks = await parseMidiToEvents(req.file.path);
   const result = translateTracksToHex(tracks, schema, gmToFfiv);
+  const sequence = assembleSPCSequence(result.tracks);
 
   fs.unlinkSync(req.file.path);
 
-  res.json(result);
+  res.json({ ...result, sequence });
 });
 
 app.listen(3001, () => console.log('Server running on http://localhost:3001'));

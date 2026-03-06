@@ -129,4 +129,72 @@ function translateTracksToHex(tracks, schema, gmToFfiv) {
   };
 }
 
-module.exports = { translateTracksToHex };
+// SPC_BASE: SPC RAM address where song data is loaded by the FFIV engine.
+// Track pointers in the song header are absolute SPC addresses, not relative offsets.
+const SPC_BASE = 0x2000;
+
+// LOOP_OFFSET: byte index within our generated track header where DA 04 sits.
+// F4 loops here so the octave is reset to 4 before notes replay each iteration,
+// preventing E1/E2 step bytes from compounding across loops.
+// Header layout: F2(0) 00 00 C8 | F3(4) 00 00 80 | DB(8) XX | DE(10) 5F | EA/EB(12) | DA(13) 04
+const LOOP_OFFSET = 13;
+
+function assembleSPCSequence(tracks) {
+  const MAX_TRACKS = 8;
+  const activeTracks = tracks.slice(0, MAX_TRACKS);
+
+  if (activeTracks.length > MAX_TRACKS) {
+    console.warn(`⚠️ MIDI has ${tracks.length} tracks; only first ${MAX_TRACKS} included (FFIV engine limit).`);
+  }
+
+  // Calculate each track's start offset from song byte 02.
+  // Song header is 18 bytes total; byte 02 is 2 bytes in, so tracks start 16 bytes (0x10) from byte 02.
+  const trackOffsets = [];
+  let offset = 0x10;
+  for (const track of activeTracks) {
+    trackOffsets.push(offset);
+    offset += track.hex.length + 3; // +3 for appended F4 lo hi
+  }
+
+  // Build per-track hex arrays with F4 loop appended.
+  const trackHexArrays = activeTracks.map((track, i) => {
+    const loopTarget = trackOffsets[i] + LOOP_OFFSET;
+    const lo = (loopTarget & 0xFF).toString(16).toUpperCase().padStart(2, '0');
+    const hi = ((loopTarget >> 8) & 0xFF).toString(16).toUpperCase().padStart(2, '0');
+    return [...track.hex, 'F4', lo, hi];
+  });
+
+  // Total sequence length includes the 18-byte header itself.
+  const trackTotalBytes = trackHexArrays.reduce((sum, arr) => sum + arr.length, 0);
+  const totalLength = 18 + trackTotalBytes;
+
+  // Build 18-byte song sequence header.
+  const seqHeader = [];
+
+  // Bytes 00–01: total length, little-endian.
+  seqHeader.push((totalLength & 0xFF).toString(16).toUpperCase().padStart(2, '0'));
+  seqHeader.push(((totalLength >> 8) & 0xFF).toString(16).toUpperCase().padStart(2, '0'));
+
+  // Bytes 02–17: 8 track pointers (2 bytes each, little-endian SPC address). Unused = 00 00.
+  for (let i = 0; i < 8; i++) {
+    if (i < activeTracks.length) {
+      const ptr = SPC_BASE + trackOffsets[i];
+      seqHeader.push((ptr & 0xFF).toString(16).toUpperCase().padStart(2, '0'));
+      seqHeader.push(((ptr >> 8) & 0xFF).toString(16).toUpperCase().padStart(2, '0'));
+    } else {
+      seqHeader.push('00');
+      seqHeader.push('00');
+    }
+  }
+
+  // Assemble and sanitise: replace any unresolved '??' with 00.
+  return [...seqHeader, ...trackHexArrays.flat()].map(tok => {
+    if (tok === '??') {
+      console.warn('⚠️ Unmapped byte in sequence, substituting 00');
+      return '00';
+    }
+    return tok;
+  });
+}
+
+module.exports = { translateTracksToHex, assembleSPCSequence };

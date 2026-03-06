@@ -125,7 +125,9 @@ DE XX       ; track relative volume
 Format: `F4 XX YY` where `XX YY` is little-endian offset counted from song byte 02.
 
 - First track always starts at byte offset `0x10` from byte 02 → pointer = `10 20`
-- To loop the whole track back to its first note, calculate: (track start offset) + (track header length) = offset of first note
+- **Loop target = trackOffset + 13** (points to the `DA 04` byte in the track header, not the first note)
+  - Looping to the first note risks octave drift: E1/E2 step bytes compound across loops if the octave isn't reset
+  - Looping to `DA 04` resets octave to 4 on every repeat, making the E1/E2 stream replay correctly
 - Write `F4 [lo] [hi]` at end of each track
 
 ---
@@ -133,9 +135,9 @@ Format: `F4 XX YY` where `XX YY` is little-endian offset counted from song byte 
 ## What Our App Currently Outputs (Gaps)
 
 1. ~~**All tracks merged into one flat byte stream**~~ ✓ — now per-track, returned as JSON array.
-2. **No song sequence header** — the 18-byte header (length + track pointers) is not generated.
+2. ~~**No song sequence header**~~ ✓ — `assembleSPCSequence()` builds the 18-byte header with correct track pointers.
 3. ~~**No track headers**~~ ✓ — F2, F3, DB, DE, EA/EB, DA 04 are now emitted per track.
-4. **No F4 loop command** — tracks don't loop yet (two-pass offset calc needed).
+4. ~~**No F4 loop command**~~ ✓ — F4 appended to each track; loop target = DA 04 byte (trackOffset + 13) to prevent octave drift.
 5. **No instrument index block download** — blob is built server-side but not separately downloadable yet.
 6. **E1/E2 are output as string literals**, not as the hex bytes 0xE1/0xE2 — this actually works fine since they ARE `E1`/`E2` in hex! The schema uses 2-char uppercase hex strings and so do these. This is correct behavior.
 
@@ -148,14 +150,17 @@ Format: `F4 XX YY` where `XX YY` is little-endian offset counted from song byte 
 - `translator.js` accepts track array, assigns instrument slots, returns `{ tracks[], instrumentIndex[], slotCount }`
 - `index.js` returns structured JSON; loads `gm-to-ffiv.json` for GM→FFIV mapping
 
-### ~~Phase 2 — Track headers~~ ✓ (partial — no F4 yet)
+### ~~Phase 2 — Track headers~~ ✓
 - Each track's hex array begins with: `F2 00 00 C8 F3 00 00 80 DB [40+slot] DE 5F EA/EB DA 04`
-- F4 loop command still pending (requires two-pass byte-length calculation)
+- F4 appended at end of each track; loop target = trackOffset + 13 (the `DA 04` byte)
 
-### Phase 3 — Song sequence header
-- Calculate per-track byte lengths
-- Build 18-byte header: length (2 bytes) + 8 track pointers (2 bytes each)
-- Prepend to assembled sequence
+### ~~Phase 3 — Song sequence header~~ ✓
+- `assembleSPCSequence(tracks)` in `translator.js` handles two-pass layout:
+  track offsets calculated first, then header + F4 bytes patched in
+- Pointer format: SPC_BASE (0x2000) + offset_from_byte02, little-endian
+- Max 8 tracks enforced (FFIV engine limit); excess tracks warned and dropped
+- `??` tokens substituted with `00` in final output
+- Server response now includes `sequence` field (array of hex strings); client downloads it directly
 
 ### Phase 4 — Instrument index block
 - Collect unique instruments from all tracks (max 13)
@@ -255,5 +260,5 @@ D5 (reverb), D4 (multi voice), D2 (fade tempo) are song-level, placed only in Tr
 1. **Track volume (DE / F2 ZZ)** — DE is `5F` (95) in almost every original track. F2 ZZ varies. A reasonable approach: map MIDI velocity average → F2 ZZ; use `DE 5F` as a fixed default.
 2. **DC/DD (transpose)** — purpose still unknown; safely omitted.
 3. ~~**@tonejs/midi instrument data**~~ ✓ — `track.instrument.number` (GM 0–127), `track.instrument.name`, `track.instrument.percussion`, `track.channel` (9 = percussion). All available without a test script.
-4. **F4 loop offsets** — requires knowing each track's byte length before patching in the loop target. Two-pass approach needed: serialize all tracks → compute offsets → patch F4 bytes.
+4. ~~**F4 loop offsets**~~ ✓ — implemented in `assembleSPCSequence`; loop target = trackOffset + 13 (DA 04).
 5. **Percussion instrument granularity** — GM channel 10 uses note pitch to select drum sound; currently all percussion tracks share one slot (Kick, 0D) as a placeholder. True mapping needs per-note GM drum → FFIV instrument splitting into virtual tracks.
