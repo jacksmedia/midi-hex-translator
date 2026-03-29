@@ -1,22 +1,30 @@
-const knownDurations = [
-  1.0, 0.75, 0.5, 0.375, 0.33, 0.25,
-  0.1875, 0.1667, 0.125, 0.083, 0.0625,
-  0.0417, 0.0313, 0.0208, 0.0156
+// Duration table in beats (quarter note = 1 beat).
+// Matches the N-SPC engine used by FFIV/FFV, verified against Luke's FF5Reader.
+// byte = noteIndex * 15 + durationIndex
+const DURATION_TABLE = [
+  4,       // 0: whole note
+  3,       // 1: dotted half
+  2,       // 2: half note
+  4/3,     // 3: triplet half
+  1.5,     // 4: dotted quarter
+  1,       // 5: quarter note
+  2/3,     // 6: triplet quarter
+  0.75,    // 7: dotted eighth
+  0.5,     // 8: eighth note
+  1/3,     // 9: triplet eighth
+  0.25,    // 10: sixteenth
+  0.5/3,   // 11: triplet sixteenth
+  0.125,   // 12: thirty-second
+  0.25/3,  // 13: triplet thirty-second
+  0.0625   // 14: sixty-fourth
 ];
 
-function decomposeDuration(total) {
-  const tolerance = 0.01;
-  const result = [];
-  let remaining = total;
+const NOTE_MAP = { 'C': 0, 'C#': 1, 'D': 2, 'D#': 3, 'E': 4, 'F': 5, 'F#': 6, 'G': 7, 'G#': 8, 'A': 9, 'A#': 10, 'B': 11 };
+const REST_INDEX = 12;
+const TIE_INDEX  = 13;
 
-  while (remaining > tolerance) {
-    const match = knownDurations.find(d => d <= remaining + tolerance);
-    if (!match) break;
-    result.push(match);
-    remaining -= match;
-  }
-
-  return Math.abs(remaining) <= tolerance ? result : null;
+function byteToHex(b) {
+  return b.toString(16).toUpperCase().padStart(2, '0');
 }
 
 function splitNoteName(name) {
@@ -25,14 +33,49 @@ function splitNoteName(name) {
   return [match[1], parseInt(match[2], 10)];
 }
 
-function translateNotesToHex(notes, schema) {
+// Greedy decomposition of a beat duration into SPC duration-table entries.
+// Returns array of duration indices, or null if decomposition fails.
+function decomposeDuration(totalBeats) {
+  const tolerance = 0.03;
+  const result = [];
+  let remaining = totalBeats;
+
+  while (remaining > tolerance) {
+    const idx = DURATION_TABLE.findIndex(d => d <= remaining + tolerance);
+    if (idx === -1) break;
+    result.push(idx);
+    remaining -= DURATION_TABLE[idx];
+  }
+
+  return Math.abs(remaining) <= tolerance ? result : null;
+}
+
+// Insert REST events for time gaps between melodic notes.
+// Converts durations from seconds to beats.
+function insertRests(notes, secondsPerBeat) {
+  const sorted = [...notes].sort((a, b) => a.time - b.time);
+  const result = [];
+  let cursor = 0; // seconds
+
+  for (const note of sorted) {
+    const gap = note.time - cursor;
+    if (gap > 0.01) {
+      result.push({ name: 'REST', durationBeats: gap / secondsPerBeat });
+    }
+    result.push({ ...note, durationBeats: note.duration / secondsPerBeat });
+    cursor = Math.max(cursor, note.time + note.duration);
+  }
+  return result;
+}
+
+function translateNotesToHex(preparedNotes) {
   const hexOutput = [];
   let currentOctave = 4;
 
-  for (const note of notes) {
+  for (const note of preparedNotes) {
     const name = note.name || 'REST';
     const [pitchClass, octave] = splitNoteName(name);
-    const isNote = !!octave;
+    const isNote = octave !== null;
 
     if (isNote && octave !== currentOctave) {
       const diff = octave - currentOctave;
@@ -41,34 +84,31 @@ function translateNotesToHex(notes, schema) {
       currentOctave = octave;
     }
 
-    const durations = decomposeDuration(note.duration);
-    if (!durations) {
-      console.warn(`❌ Unable to decompose duration: ${note.duration}`);
+    const durIndices = decomposeDuration(note.durationBeats);
+    if (!durIndices || durIndices.length === 0) {
+      console.warn(`Unable to decompose duration: ${note.durationBeats.toFixed(4)} beats (${name})`);
       hexOutput.push('??');
       continue;
     }
 
-    durations.forEach((d, i) => {
-      const durKey = d.toString();
-      const noteKey = isNote ? `${pitchClass}4:${durKey}` : `${name}:${durKey}`;
-      const schemaKey = i === 0 ? noteKey : `TIE:${durKey}`;
-      const hex = schema[schemaKey];
+    const baseIdx = isNote ? (NOTE_MAP[pitchClass] ?? -1) : (name === 'TIE' ? TIE_INDEX : REST_INDEX);
+    if (baseIdx < 0) {
+      console.warn(`Unknown pitch class: ${pitchClass}`);
+      hexOutput.push('??');
+      continue;
+    }
 
-      if (!hex) {
-        console.warn(`❌ Unmatched schemaKey: ${schemaKey}`);
-        hexOutput.push('??');
-      } else {
-        hexOutput.push(hex);
-      }
+    durIndices.forEach((durIdx, i) => {
+      const noteIdx = i === 0 ? baseIdx : TIE_INDEX;
+      hexOutput.push(byteToHex(noteIdx * 15 + durIdx));
     });
   }
 
   return hexOutput;
 }
 
-// All drum hits are mapped to C4 at a fixed short duration.
-// The instrument (set by DB) is what defines the drum sound in the SPC engine.
-const DRUM_HIT_DURATION = 0.0625;
+// All drum hits mapped to C4 at a fixed short duration.
+const DRUM_HIT_BEATS = 0.25; // sixteenth note
 
 const FFIV_DRUM_NAMES = {
   8: 'Xylophone', 10: 'Timpani', 12: 'Snare low', 13: 'Kick',
@@ -76,13 +116,11 @@ const FFIV_DRUM_NAMES = {
   18: 'Cowbell', 19: 'Shaker', 20: 'Whistle', 21: 'Conga fuller'
 };
 
-// Splits a single GM percussion track into one virtual track per FFIV drum instrument.
-// Each virtual track's notes are: REST(gap) + C4(hit) pairs, ready for translateNotesToHex.
-function expandPercussionTrack(track, gmDrumMap) {
-  const groups = {}; // ffivValue (number) → notes[]
+function expandPercussionTrack(track, gmDrumMap, secondsPerBeat) {
+  const groups = {};
 
   for (const note of track.notes) {
-    const ffivValue = gmDrumMap[note.midi] ?? 13; // default Kick
+    const ffivValue = gmDrumMap[note.midi] ?? 13;
     if (!groups[ffivValue]) groups[ffivValue] = [];
     groups[ffivValue].push(note);
   }
@@ -92,13 +130,15 @@ function expandPercussionTrack(track, gmDrumMap) {
     const sorted = [...notes].sort((a, b) => a.time - b.time);
 
     const virtualNotes = [];
-    let cursor = 0;
+    let cursor = 0; // seconds
 
     for (const note of sorted) {
       const gap = note.time - cursor;
-      if (gap > 0.01) virtualNotes.push({ name: 'REST', duration: gap });
-      virtualNotes.push({ name: 'C4', duration: DRUM_HIT_DURATION });
-      cursor = note.time + DRUM_HIT_DURATION;
+      if (gap > 0.01) {
+        virtualNotes.push({ name: 'REST', durationBeats: gap / secondsPerBeat });
+      }
+      virtualNotes.push({ name: 'C4', durationBeats: DRUM_HIT_BEATS });
+      cursor = note.time + (DRUM_HIT_BEATS * secondsPerBeat);
     }
 
     return {
@@ -112,21 +152,22 @@ function expandPercussionTrack(track, gmDrumMap) {
   });
 }
 
-function translateTracksToHex(tracks, schema, gmToFfiv, gmDrumMap) {
-  // Expand any percussion tracks into per-drum-instrument virtual tracks first.
+function translateTracksToHex(tracks, schema, gmToFfiv, gmDrumMap, bpm) {
+  const secondsPerBeat = 60 / bpm;
+
   const activeTracks = [];
   for (const track of tracks) {
     if (track.notes.length === 0) continue;
     if (track.isPercussion) {
-      activeTracks.push(...expandPercussionTrack(track, gmDrumMap));
+      activeTracks.push(...expandPercussionTrack(track, gmDrumMap, secondsPerBeat));
     } else {
       activeTracks.push(track);
     }
   }
 
-  // Assign slots: melodic tracks keyed by gmNumber, drum tracks keyed by ffivValue.
-  const melodicSlotMap = {}; // gmNumber → slot
-  const drumSlotMap = {};    // ffivValue → slot
+  // Assign slots: melodic by gmNumber, drums by ffivValue.
+  const melodicSlotMap = {};
+  const drumSlotMap = {};
   let nextSlot = 0;
 
   for (const track of activeTracks) {
@@ -141,7 +182,7 @@ function translateTracksToHex(tracks, schema, gmToFfiv, gmDrumMap) {
     }
   }
 
-  // Build instrument index (slot → FFIV ROM value).
+  // Build instrument index (slot -> FFIV ROM value).
   const instrumentIndex = [];
   for (const [gm, slot] of Object.entries(melodicSlotMap)) {
     instrumentIndex[slot] = gmToFfiv[parseInt(gm)];
@@ -169,7 +210,13 @@ function translateTracksToHex(tracks, schema, gmToFfiv, gmDrumMap) {
       'DA', '04'
     ];
 
-    const noteHex = translateNotesToHex(track.notes, schema);
+    // Melodic tracks: insert rests and convert seconds->beats.
+    // Percussion tracks: already have durationBeats from expandPercussionTrack.
+    const preparedNotes = isPerc
+      ? track.notes
+      : insertRests(track.notes, secondsPerBeat);
+
+    const noteHex = translateNotesToHex(preparedNotes);
 
     return {
       trackIndex: track.trackIndex,
@@ -190,25 +237,21 @@ function translateTracksToHex(tracks, schema, gmToFfiv, gmDrumMap) {
 }
 
 // SPC_BASE: SPC RAM address where song data is loaded by the FFIV engine.
-// Track pointers in the song header are absolute SPC addresses, not relative offsets.
 const SPC_BASE = 0x2000;
 
-// LOOP_OFFSET: byte index within our generated track header where DA 04 sits.
-// F4 loops here so the octave is reset to 4 before notes replay each iteration,
-// preventing E1/E2 step bytes from compounding across loops.
-// Header layout: F2(0) 00 00 C8 | F3(4) 00 00 80 | DB(8) XX | DE(10) 5F | EA/EB(12) | DA(13) 04
+// LOOP_OFFSET: byte index within track header where DA 04 sits.
+// F4 loops here so octave resets to 4 before notes replay.
+// Header: F2(0) 00 00 C8 | F3(4) 00 00 80 | DB(8) XX | DE(10) 5F | EA/EB(12) | DA(13) 04
 const LOOP_OFFSET = 13;
 
 function assembleSPCSequence(tracks) {
   const MAX_TRACKS = 8;
   const activeTracks = tracks.slice(0, MAX_TRACKS);
 
-  if (activeTracks.length > MAX_TRACKS) {
-    console.warn(`⚠️ MIDI has ${tracks.length} tracks; only first ${MAX_TRACKS} included (FFIV engine limit).`);
+  if (tracks.length > MAX_TRACKS) {
+    console.warn(`MIDI has ${tracks.length} tracks; only first ${MAX_TRACKS} included (FFIV engine limit).`);
   }
 
-  // Calculate each track's start offset from song byte 02.
-  // Song header is 18 bytes total; byte 02 is 2 bytes in, so tracks start 16 bytes (0x10) from byte 02.
   const trackOffsets = [];
   let offset = 0x10;
   for (const track of activeTracks) {
@@ -216,7 +259,6 @@ function assembleSPCSequence(tracks) {
     offset += track.hex.length + 3; // +3 for appended F4 lo hi
   }
 
-  // Build per-track hex arrays with F4 loop appended.
   const trackHexArrays = activeTracks.map((track, i) => {
     const loopTarget = trackOffsets[i] + LOOP_OFFSET;
     const lo = (loopTarget & 0xFF).toString(16).toUpperCase().padStart(2, '0');
@@ -224,18 +266,13 @@ function assembleSPCSequence(tracks) {
     return [...track.hex, 'F4', lo, hi];
   });
 
-  // Total sequence length includes the 18-byte header itself.
   const trackTotalBytes = trackHexArrays.reduce((sum, arr) => sum + arr.length, 0);
   const totalLength = 18 + trackTotalBytes;
 
-  // Build 18-byte song sequence header.
   const seqHeader = [];
-
-  // Bytes 00–01: total length, little-endian.
   seqHeader.push((totalLength & 0xFF).toString(16).toUpperCase().padStart(2, '0'));
   seqHeader.push(((totalLength >> 8) & 0xFF).toString(16).toUpperCase().padStart(2, '0'));
 
-  // Bytes 02–17: 8 track pointers (2 bytes each, little-endian SPC address). Unused = 00 00.
   for (let i = 0; i < 8; i++) {
     if (i < activeTracks.length) {
       const ptr = SPC_BASE + trackOffsets[i];
@@ -247,10 +284,9 @@ function assembleSPCSequence(tracks) {
     }
   }
 
-  // Assemble and sanitise: replace any unresolved '??' with 00.
   return [...seqHeader, ...trackHexArrays.flat()].map(tok => {
     if (tok === '??') {
-      console.warn('⚠️ Unmapped byte in sequence, substituting 00');
+      console.warn('Unmapped byte in sequence, substituting 00');
       return '00';
     }
     return tok;

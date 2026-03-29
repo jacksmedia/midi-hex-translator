@@ -5,7 +5,9 @@ async function parseMidiToEvents(input) {
   const data = Buffer.isBuffer(input) ? input : fs.readFileSync(input);
   const midi = new Midi(data);
 
-  return midi.tracks.map((track, trackIndex) => {
+  const bpm = midi.header.tempos.length > 0 ? midi.header.tempos[0].bpm : 120;
+
+  const tracks = midi.tracks.map((track, trackIndex) => {
     const isPercussion = track.channel === 9 || track.instrument?.percussion === true;
 
     return {
@@ -23,6 +25,8 @@ async function parseMidiToEvents(input) {
       }))
     };
   });
+
+  return { tracks, bpm };
 }
 
 module.exports = { parseMidiToEvents };

@@ -16,8 +16,8 @@ const gmToFfiv  = JSON.parse(fs.readFileSync(path.join(__dirname, '../translatio
 const gmDrumMap = JSON.parse(fs.readFileSync(path.join(__dirname, '../translation-schemas/gm-drums.json'), 'utf-8'));
 
 app.post('/upload', upload.single('midi'), async (req, res) => {
-  const tracks = await parseMidiToEvents(req.file.path);
-  const result = translateTracksToHex(tracks, schema, gmToFfiv, gmDrumMap);
+  const { tracks, bpm } = await parseMidiToEvents(req.file.path);
+  const result = translateTracksToHex(tracks, schema, gmToFfiv, gmDrumMap, bpm);
   const sequence = assembleSPCSequence(result.tracks);
 
   fs.unlinkSync(req.file.path);
@@ -31,7 +31,7 @@ app.post('/upload', upload.single('midi'), async (req, res) => {
     noteCount: notes.length
   }));
 
-  res.json({ ...result, sequence, rawTracks });
+  res.json({ ...result, sequence, rawTracks, bpm });
 });
 
 app.listen(3001, () => console.log('Server running on http://localhost:3001'));

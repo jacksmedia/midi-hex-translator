@@ -1,7 +1,11 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Read(//c/Users/J4cks/**)",
+      "Bash(node -c translator.js)",
+      "Bash(node -c parser.js)",
+      "Bash(node -c index.js)"
     ]
   }
 }

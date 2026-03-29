@@ -21,3 +21,10 @@ If you are developing a production application, we recommend using TypeScript wi
 type:
 
 `npm run dev`
+
+
+## Inspiration
+
+Core engineering informed by [birdulon's FF5Reader](https://git.ufeff.net/birdulon/FF5Reader/src/branch/master).
+
+Adapted with assistance from Claude Opus 4.6 from Anthropic.
