@@ -31,9 +31,18 @@ module.exports = async function handler(req, res) {
 
   await runMiddleware(req, res, upload.single('midi'));
 
-  const tracks = await parseMidiToEvents(req.file.buffer);
-  const result = translateTracksToHex(tracks, schema, gmToFfiv, gmDrumMap);
+  const { tracks, bpm } = await parseMidiToEvents(req.file.buffer);
+  const result = translateTracksToHex(tracks, schema, gmToFfiv, gmDrumMap, bpm);
   const sequence = assembleSPCSequence(result.tracks);
 
-  res.json({ ...result, sequence });
+  const rawTracks = tracks.map(({ trackIndex, channel, gmName, gmNumber, isPercussion, notes }) => ({
+    trackIndex,
+    channel,
+    gmName,
+    gmNumber,
+    isPercussion,
+    noteCount: notes.length
+  }));
+
+  res.json({ ...result, sequence, rawTracks, bpm });
 };
