@@ -80,7 +80,7 @@ function translateNotesToHex(preparedNotes) {
     if (isNote && octave !== currentOctave) {
       const diff = octave - currentOctave;
       const step = diff > 0 ? 'E1' : 'E2';
-      for (let i = 0; i < Math.abs(diff); i++) hexOutput.push(step);
+      for (let j = 0; j < Math.abs(diff); j++) hexOutput.push(step);
       currentOctave = octave;
     }
 
@@ -105,6 +105,59 @@ function translateNotesToHex(preparedNotes) {
   }
 
   return hexOutput;
+}
+
+// E0/F0 loop compression.
+// Scans note hex for consecutive repeating patterns and wraps them in
+// E0 XX [pattern] F0  (plays the block XX+1 times total).
+function compressWithLoops(hexArray) {
+  const MAX_PAT_LEN = 256;
+  const result = [];
+  let i = 0;
+
+  while (i < hexArray.length) {
+    let bestLen = 0;
+    let bestCount = 0;
+    let bestSavings = 0;
+
+    const maxLen = Math.min(MAX_PAT_LEN, Math.floor((hexArray.length - i) / 2));
+
+    for (let len = 1; len <= maxLen; len++) {
+      // Count consecutive repeats of this pattern.
+      let count = 1;
+      const maxCount = Math.min(256, Math.floor((hexArray.length - i) / len));
+      for (let c = 1; c < maxCount; c++) {
+        let match = true;
+        for (let k = 0; k < len; k++) {
+          if (hexArray[i + len * c + k] !== hexArray[i + k]) { match = false; break; }
+        }
+        if (!match) break;
+        count++;
+      }
+
+      if (count < 2) continue;
+
+      // savings = bytes removed - bytes added (E0 XX … F0 = 3 extra bytes)
+      const savings = len * (count - 1) - 3;
+      if (savings > bestSavings) {
+        bestSavings = savings;
+        bestLen = len;
+        bestCount = count;
+      }
+    }
+
+    if (bestSavings > 0) {
+      result.push('E0', byteToHex(bestCount - 1));
+      for (let k = 0; k < bestLen; k++) result.push(hexArray[i + k]);
+      result.push('F0');
+      i += bestLen * bestCount;
+    } else {
+      result.push(hexArray[i]);
+      i++;
+    }
+  }
+
+  return result;
 }
 
 // All drum hits mapped to C4 at a fixed short duration.
@@ -216,7 +269,7 @@ function translateTracksToHex(tracks, schema, gmToFfiv, gmDrumMap, bpm) {
       ? track.notes
       : insertRests(track.notes, secondsPerBeat);
 
-    const noteHex = translateNotesToHex(preparedNotes);
+    const noteHex = compressWithLoops(translateNotesToHex(preparedNotes));
 
     return {
       trackIndex: track.trackIndex,
@@ -293,4 +346,4 @@ function assembleSPCSequence(tracks) {
   });
 }
 
-module.exports = { translateTracksToHex, assembleSPCSequence, expandPercussionTrack };
+module.exports = { translateTracksToHex, assembleSPCSequence, expandPercussionTrack, compressWithLoops };
