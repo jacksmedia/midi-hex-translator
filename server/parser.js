@@ -6,6 +6,7 @@ async function parseMidiToEvents(input) {
   const midi = new Midi(data);
 
   const bpm = midi.header.tempos.length > 0 ? midi.header.tempos[0].bpm : 120;
+  const tempos = midi.header.tempos.map(t => ({ bpm: t.bpm, time: t.time }));
 
   const tracks = midi.tracks.map((track, trackIndex) => {
     const isPercussion = track.channel === 9 || track.instrument?.percussion === true;
@@ -26,7 +27,7 @@ async function parseMidiToEvents(input) {
     };
   });
 
-  return { tracks, bpm };
+  return { tracks, bpm, tempos };
 }
 
 module.exports = { parseMidiToEvents };

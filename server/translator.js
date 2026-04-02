@@ -50,9 +50,19 @@ function decomposeDuration(totalBeats) {
   return Math.abs(remaining) <= tolerance ? result : null;
 }
 
+// Returns the active BPM at a given time (seconds) from a sorted tempos array.
+function bpmAtTime(tempos, time) {
+  let active = tempos.length > 0 ? tempos[0].bpm : 120;
+  for (const t of tempos) {
+    if (t.time <= time) active = t.bpm;
+    else break;
+  }
+  return active;
+}
+
 // Insert REST events for time gaps between melodic notes.
-// Converts durations from seconds to beats.
-function insertRests(notes, secondsPerBeat) {
+// Converts durations from seconds to beats using the tempo active at each event.
+function insertRests(notes, tempos) {
   const sorted = [...notes].sort((a, b) => a.time - b.time);
   const result = [];
   let cursor = 0; // seconds
@@ -60,9 +70,11 @@ function insertRests(notes, secondsPerBeat) {
   for (const note of sorted) {
     const gap = note.time - cursor;
     if (gap > 0.01) {
-      result.push({ name: 'REST', durationBeats: gap / secondsPerBeat });
+      const spb = 60 / bpmAtTime(tempos, cursor);
+      result.push({ name: 'REST', durationBeats: gap / spb });
     }
-    result.push({ ...note, durationBeats: note.duration / secondsPerBeat });
+    const spb = 60 / bpmAtTime(tempos, note.time);
+    result.push({ ...note, durationBeats: note.duration / spb });
     cursor = Math.max(cursor, note.time + note.duration);
   }
   return result;
@@ -169,7 +181,7 @@ const FFIV_DRUM_NAMES = {
   18: 'Cowbell', 19: 'Shaker', 20: 'Whistle', 21: 'Conga fuller'
 };
 
-function expandPercussionTrack(track, gmDrumMap, secondsPerBeat) {
+function expandPercussionTrack(track, gmDrumMap, tempos) {
   const groups = {};
 
   for (const note of track.notes) {
@@ -188,10 +200,12 @@ function expandPercussionTrack(track, gmDrumMap, secondsPerBeat) {
     for (const note of sorted) {
       const gap = note.time - cursor;
       if (gap > 0.01) {
-        virtualNotes.push({ name: 'REST', durationBeats: gap / secondsPerBeat });
+        const spb = 60 / bpmAtTime(tempos, cursor);
+        virtualNotes.push({ name: 'REST', durationBeats: gap / spb });
       }
       virtualNotes.push({ name: 'C4', durationBeats: DRUM_HIT_BEATS });
-      cursor = note.time + (DRUM_HIT_BEATS * secondsPerBeat);
+      const spb = 60 / bpmAtTime(tempos, note.time);
+      cursor = note.time + (DRUM_HIT_BEATS * spb);
     }
 
     return {
@@ -205,14 +219,12 @@ function expandPercussionTrack(track, gmDrumMap, secondsPerBeat) {
   });
 }
 
-function translateTracksToHex(tracks, schema, gmToFfiv, gmDrumMap, bpm) {
-  const secondsPerBeat = 60 / bpm;
-
+function translateTracksToHex(tracks, schema, gmToFfiv, gmDrumMap, bpm, tempos = [{ bpm, time: 0 }]) {
   const activeTracks = [];
   for (const track of tracks) {
     if (track.notes.length === 0) continue;
     if (track.isPercussion) {
-      activeTracks.push(...expandPercussionTrack(track, gmDrumMap, secondsPerBeat));
+      activeTracks.push(...expandPercussionTrack(track, gmDrumMap, tempos));
     } else {
       activeTracks.push(track);
     }
@@ -267,7 +279,7 @@ function translateTracksToHex(tracks, schema, gmToFfiv, gmDrumMap, bpm) {
     // Percussion tracks: already have durationBeats from expandPercussionTrack.
     const preparedNotes = isPerc
       ? track.notes
-      : insertRests(track.notes, secondsPerBeat);
+      : insertRests(track.notes, tempos);
 
     const noteHex = compressWithLoops(translateNotesToHex(preparedNotes));
 
