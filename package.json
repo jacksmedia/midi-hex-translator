@@ -1,6 +1,6 @@
 {
   "name": "midi-hex-translator",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "private": true,
   "dependencies": {
     "@tonejs/midi": "^2.0.28",
